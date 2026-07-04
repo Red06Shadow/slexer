@@ -19,14 +19,14 @@ namespace slexer
     {
     private:
         inline static void _S_option(std::vector<
-                                                 myregex::basic_dfa<charT,
+                                                 myregex::basic_table<charT,
                                                  typename slexer::basic_lexer<charT, idT>::_I_idT>> &,
                                      const std::initializer_list<basic_rule<charT, idT>> &);
 
     private:
         /// @brief Tabla de transiciones para todos los casos
         std::vector<
-            myregex::basic_dfa<charT,
+            myregex::basic_table<charT,
                                typename slexer::basic_lexer<charT, idT>::_I_idT>>
             _M_group_tables;
         // std::vector<slexer::basic_lexer::handle> _M_handles;
@@ -54,7 +54,7 @@ namespace slexer
     };
     template <typename charT, typename idT>
     void basic_builder<charT, idT>::_S_option(std::vector<
-                                                 myregex::basic_dfa<charT,
+                                                 myregex::basic_table<charT,
                                                  typename slexer::basic_lexer<charT, idT>::_I_idT>> &_M_regex_reference, const std::initializer_list<basic_rule<charT, idT>> &_M_rules)
     {
         std::vector<std::pair<typename slexer::basic_lexer<charT, idT>::_I_idT, std::string>> regexs;
@@ -63,8 +63,9 @@ namespace slexer
             regexs.push_back({{_id, _funtion}, _regex});
 
         _M_regex_reference.push_back(
-            myregex::basic_builder<charT, typename slexer::basic_lexer<charT, idT>::_I_idT>::build_dfa(
-                myregex::basic_builder<charT, typename slexer::basic_lexer<charT, idT>::_I_idT>::build_nfa(regexs)));
+            myregex::basic_builder<charT, typename slexer::basic_lexer<charT, idT>::_I_idT>::build_table(
+                myregex::basic_builder<charT, typename slexer::basic_lexer<charT, idT>::_I_idT>::build_dfa(
+                    myregex::basic_builder<charT, typename slexer::basic_lexer<charT, idT>::_I_idT>::build_nfa(regexs))));
     }
 
     template <typename idT>

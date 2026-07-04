@@ -126,7 +126,7 @@ namespace slexer
 
     private:
         /// @brief Tablas de expreseiones
-        std::basic_allocator<myregex::basic_dfa<charT, _I_idT>> _M_group_tables;
+        std::basic_allocator<myregex::basic_table<charT, _I_idT>> _M_group_tables;
         /// @brief Buffer de lectura
         slexer::basic_buffer<charT> _M_buffer_input;
 
@@ -146,12 +146,25 @@ namespace slexer
         /// @brief Contador de posicion de archivo
         /// @param letter caracter actual
         inline void _M_manager_position(charT letter);
+        constexpr inline static size_t _S_value(charT caracter)
+        {
+            size_t value;
+            if constexpr (std::is_same_v<charT, char>)
+                return (unsigned char)(caracter);
+            else
+            {
+                if constexpr (sizeof(wchar_t) == 2)
+                    return (unsigned short)(caracter);
+                else
+                    return (unsigned int)(caracter);
+            }
+        }
 
     public:
         /// @brief
         /// @param group
         /// @param size_buffer
-        basic_lexer(std::basic_allocator<myregex::basic_dfa<charT, _I_idT>> &&group, unsigned int size_buffer)
+        basic_lexer(std::basic_allocator<myregex::basic_table<charT, _I_idT>> &&group, unsigned int size_buffer)
             : _M_group_tables(std::move(group)),
               _M_buffer_input(size_buffer),
               _M_capture_line(0),
@@ -242,10 +255,10 @@ namespace slexer
         while (_M_buffer_input.position() < _M_buffer_input.size())
         {
             charT letter = _M_buffer_input.peak();
-            auto transition = _M_group_tables[_M_master._M_begin].transitions().find({status, letter});
-            if (transition == _M_group_tables[_M_master._M_begin].transitions().end())
+            size_t next = _M_group_tables[_M_master._M_begin].transitions()[status * myregex::basic_table<charT, _I_idT>::dictionary + _S_value(letter)];
+            if (next == -1ULL)
                 break; // No hay transición, rechazar
-            status = transition->second;
+            status = next;
             str.push_back(letter);
             if (status == acceptance_status)
                 goto _M_jump_if_status_is_acceptance;

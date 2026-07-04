@@ -29,7 +29,7 @@ namespace myregex
         inline static void copy(basic_table &, const basic_table &);
 
     public:
-        basic_table() : Q_transitions(nullptr), Q_table(0), Q_table({}) {}
+        basic_table() : Q_transitions(nullptr), Q_table({}) {}
         basic_table(const std::vector<myregex::state<idT>>&);
         basic_table(std::vector<myregex::state<idT>>&&);
         basic_table(const basic_table &);
@@ -39,7 +39,7 @@ namespace myregex
         inline const Qtable& status() const { return Q_table; }
         inline const Transitions &transitions() const { return Q_transitions; }
         inline static constexpr size_t dictionary = std::pow(256ULL, sizeof(charT));
-        inline size_t size() const { return Q_table * myregex::basic_table<charT, idT>::dictionary * sizeof(size_t); }
+        inline size_t size() const { return Q_table.size() * myregex::basic_table<charT, idT>::dictionary * sizeof(size_t); }
 #if DEBUG
         void view() const;
 #endif
