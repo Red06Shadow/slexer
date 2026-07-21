@@ -1,8 +1,9 @@
 #ifndef SLEXEREXCEPTION
 #define SLEXEREXCEPTION
 
-#include <stdexcept>
 #include <slexer/token/token.hpp>
+//<--...
+#include <stdexcept>
 
 namespace slexer
 {
@@ -46,5 +47,6 @@ namespace slexer
         ~basic_lexical_error() {}
     };
 } // namespace slexer
+//<--...
 
 #endif

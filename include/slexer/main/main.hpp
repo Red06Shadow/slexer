@@ -1,15 +1,17 @@
 #ifndef SLEXERMAIN
 #define SLEXERMAIN
 
-#include <iostream>
-#include <fstream>
-#include <queue>
+#include <utilities/memory.hpp>
+#include <myregex/automaton/table.hpp>
 #include <slexer/buffer/buffer.hpp>
 #include <slexer/token/token.hpp>
 #include <slexer/tokenstream/tokenstream.hpp>
-#include <myregex/main/main.hpp>
-#include <slexer/utilities/memory.hpp>
 #include <slexer/exceptions/exceptions.hpp>
+//<--...
+#include <iostream>
+#include <fstream>
+#include <filesystem>
+#include <queue>
 
 
 namespace slexer
@@ -25,45 +27,26 @@ namespace slexer
 
     };
     _GLIBCXX_NODISCARD _GLIBCXX_CONSTEXPR inline Flags
-    operator&(Flags __a, Flags __b) _GLIBCXX_NOTHROW
-    {
-        return Flags(static_cast<unsigned int>(__a) & static_cast<unsigned int>(__b));
-    }
+    operator&(Flags __a, Flags __b) _GLIBCXX_NOTHROW { return Flags(static_cast<unsigned int>(__a) & static_cast<unsigned int>(__b)); }
     _GLIBCXX_NODISCARD _GLIBCXX_CONSTEXPR inline Flags
-    operator|(Flags __a, Flags __b) _GLIBCXX_NOTHROW
-    {
-        return Flags(static_cast<unsigned int>(__a) | static_cast<unsigned int>(__b));
-    }
+    operator|(Flags __a, Flags __b) _GLIBCXX_NOTHROW { return Flags(static_cast<unsigned int>(__a) | static_cast<unsigned int>(__b)); }
     _GLIBCXX_NODISCARD _GLIBCXX_CONSTEXPR inline Flags
-    operator^(Flags __a, Flags __b) _GLIBCXX_NOTHROW
-    {
-        return Flags(static_cast<unsigned int>(__a) ^ static_cast<unsigned int>(__b));
-    }
+    operator^(Flags __a, Flags __b) _GLIBCXX_NOTHROW { return Flags(static_cast<unsigned int>(__a) ^ static_cast<unsigned int>(__b)); }
     _GLIBCXX14_CONSTEXPR
     inline const Flags &
-    operator&=(Flags &__a, Flags __b) _GLIBCXX_NOTHROW
-    {
-        return __a = __a & __b;
-    }
+    operator&=(Flags &__a, Flags __b) _GLIBCXX_NOTHROW { return __a = __a & __b; }
     _GLIBCXX14_CONSTEXPR
     inline const Flags &
-    operator|=(Flags &__a, Flags __b) _GLIBCXX_NOTHROW
-    {
-        return __a = __a | __b;
-    }
+    operator|=(Flags &__a, Flags __b) _GLIBCXX_NOTHROW { return __a = __a | __b; }
     _GLIBCXX14_CONSTEXPR
     inline const Flags &
-    operator^=(Flags &__a, Flags __b) _GLIBCXX_NOTHROW
-    {
-        return __a = __a ^ __b;
-    }
+    operator^=(Flags &__a, Flags __b) _GLIBCXX_NOTHROW { return __a = __a ^ __b; }
 
     template <typename charT, typename idT>
     class basic_lexer
     {
     public:
         static_assert(std::is_unsigned_v<idT> | std::is_enum_v<idT>, "in basic_lexer: do you no have template with value is not a unsigned integer");
-
         class master
         {
         private:
@@ -102,13 +85,13 @@ namespace slexer
         };
 
         /// @brief Patron de la funcion de captura
-        typedef void (*handle)(basic_lexer::master &);
+        typedef void (*handle)(basic_lexer<charT, idT>::master &);
         /// @brief Valor por defecto de inicio
         inline static constexpr size_t main = 0;
         /// @brief Funcion de captura por defecto
         static inline constexpr basic_lexer<charT, idT>::handle defaultf = [](basic_lexer<charT, idT>::master &) -> void {};
 
-    private:
+    public:
         class _I_idT
         {
         private:
@@ -121,6 +104,11 @@ namespace slexer
             inline idT id() const { return _M_id; }
             inline handle funt() const { return _M_handle; }
             friend bool operator<(const _I_idT &lhs, const _I_idT &rhs) { return lhs._M_id < rhs._M_id; }
+            friend std::ostream &operator<<(std::ostream &out, const _I_idT &element)
+            {
+                // out << _M_association_id;
+                return out;
+            }
             ~_I_idT() {}
         };
 
@@ -143,6 +131,7 @@ namespace slexer
         /// @param
         /// @param
         void _M_caption(std::basic_ifstream<charT> &, master &, basic_lexer::handle &);
+        void _M_caption(typename std::basic_string<charT>::const_iterator &, const typename std::basic_string<charT>::const_iterator &, master &, basic_lexer::handle &);
         /// @brief Contador de posicion de archivo
         /// @param letter caracter actual
         inline void _M_manager_position(charT letter);
@@ -196,17 +185,18 @@ namespace slexer
         /// @brief
         /// @return
         slexer::basic_tokenstream<charT, idT> tokenize(std::basic_ifstream<charT> &_M_stream);
-        // /// @brief
-        // void view() const;
 
-        size_t size() const {
+        slexer::basic_tokenstream<charT, idT> tokenize(const std::basic_string<charT> &_M_stream);
+
+        size_t size() const
+        {
             size_t size_ = 0;
             for (size_t i = 0; i < _M_group_tables.size(); i++)
-                size_ =  _M_group_tables[i].size();
+                size_ = _M_group_tables[i].size();
             return size_;
         }
 
-        void compiler(std::ofstream& out);
+        void compiler(const std::filesystem::path &path);
 
         friend basic_builder<charT, idT>;
     };
@@ -224,15 +214,6 @@ namespace slexer
         }
         return *this;
     }
-
-    // void basic_lexer::view() const
-    // {
-    //     for (size_t i = 0; i < _M_group_tables.size(); i++)
-    //     {
-    //         _M_group_tables[i].view();
-    //         std::selector<charT>::stream() << std::endl;
-    //     }
-    // }
     template <typename charT, typename idT>
     void basic_lexer<charT, idT>::_M_manager_position(charT letter)
     {
@@ -317,10 +298,82 @@ namespace slexer
         return _M_basic_tokenstream;
     }
 
+    template <typename charT, typename idT>
+    void basic_lexer<charT, idT>::_M_caption(typename std::basic_string<charT>::const_iterator &_M_string, const typename std::basic_string<charT>::const_iterator &_M_end, master &_M_master, basic_lexer::handle &_M_handle)
+    {
+        bool acceptance = false;
+        size_t status = 0;
+        size_t acceptance_status = -1ULL;
+        _I_idT id{};
+        std::basic_string<charT> str{};
+        while (_M_string < _M_end)
+        {
+            charT letter = *_M_string;
+            size_t next = _M_group_tables[_M_master._M_begin].transitions()[status * myregex::basic_table<charT, _I_idT>::dictionary + _S_value(letter)];
+            if (next == -1ULL)
+                break; // No hay transición, rechazar
+            status = next;
+            str.push_back(letter);
+            if (status == acceptance_status)
+                goto _M_jump_if_status_is_acceptance;
+            else if (_M_group_tables[_M_master._M_begin].status()[status].valid())
+            {
+                acceptance_status = status;
+                id = _M_group_tables[_M_master._M_begin].status()[status].get();
+                acceptance = true;
+            }
+        _M_jump_if_status_is_acceptance:
+            _M_string++;
+            _M_manager_position(letter);
+        }
+        _M_master._capture._M_text = std::move(str);
+        _M_master._capture._M_id = id.id();
+        if (acceptance)
+            _M_handle = id.funt();
+        else
+            _M_master.setflag(Flags::_S_emit_error);
+    }
+
+    template <typename charT, typename idT>
+    slexer::basic_tokenstream<charT, idT> basic_lexer<charT, idT>::tokenize(const std::basic_string<charT> &_M_stream)
+    {
+        slexer::basic_tokenstream<charT, idT> _M_basic_tokenstream;
+        master _M_master{_M_group_tables.size(), 80};
+        typename std::basic_string<charT>::const_iterator it = _M_stream.begin();
+        while (it < _M_stream.end())
+        {
+            handle _M_handle = nullptr;
+            _M_master._capture._M_position = _M_capture_position;
+            _M_master._capture._M_line = _M_capture_line;
+            _M_master._capture._M_column = _M_capture_column;
+            basic_lexer::_M_caption(it, _M_stream.end(), _M_master, _M_handle);
+            if (_M_master.getflag(Flags::_S_emit_error))
+            {
+                if constexpr (std::is_same_v<charT, char>)
+                    throw slexer::basic_lexical_error<charT, idT>("token inseperado o mal formado", _M_master._capture);
+                else
+                    throw slexer::basic_lexical_error<charT, idT>(L"token inseperado o mal formado", _M_master._capture);
+            }
+            if (_M_handle == nullptr)
+                continue;
+            _M_handle(_M_master);
+            if (_M_master.getflag(Flags::_S_push_capture))
+                _M_master._queue_emit.push(_M_master._capture);
+            if (!_M_master.getflag(Flags::_S_emit_token))
+                continue;
+            while (!_M_master._queue_emit.empty())
+            {
+                _M_basic_tokenstream.push(std::move(_M_master._queue_emit.front()));
+                _M_master._queue_emit.pop();
+            }
+        }
+        return _M_basic_tokenstream;
+    }
     template <typename idT>
     using lexer = basic_lexer<char, idT>;
     template <typename idT>
     using wlexer = basic_lexer<wchar_t, idT>;
 } // namespace slexer
+//<--...
 
 #endif

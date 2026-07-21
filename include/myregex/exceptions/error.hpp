@@ -2,73 +2,87 @@
 #define MYREGEXERROR
 
 #include <stdexcept>
-#include <myregex/utilities/range.hpp>
+#include <stdint.h>
+#include <utilities/range.hpp>
 
 namespace myregex
 {
-    enum class error_type : unsigned char
+    enum class error_type : uint8_t
     {
         _S_syntax_error,
         _S_runtime_error,
-        _S_input_error
+        _S_input_error,
+        _S_none
     };
-    class regex_error : public std::runtime_error
+    template <typename charT>
+    class basic_regex_error : public std::exception
     {
     private:
-        std::string syntax_error_viewer(const stringrange& range, size_t a, size_t b);
-        
-    private:
-        inline static const char* _M_name_error_type[3] = {"syntax_error\0", "runtime_error\0", "input_error\0"};
-        myregex::error_type type : 2;
-        unsigned char code : 6;
+        static std::basic_string<charT> _S_syntax_error_viewer(const basic_string_range<charT> &, size_t, size_t);
 
-    public: // Averigurar por los errores para acdenas wchar_t
-        explicit regex_error(const std::string &_message, myregex::error_type _type, unsigned char _code);
-        explicit regex_error(const std::string &_message, size_t _index, const stringrange &_regular_expresion, unsigned char _code);
-        explicit regex_error(const std::string &_message, size_t _index_a, size_t _index_b, const stringrange &_regular_expresion, unsigned char _code);
-        virtual ~regex_error() _GLIBCXX_TXN_SAFE_DYN _GLIBCXX_NOTHROW {}
+    private:
+        inline static const char *_S_type_error[4] = {"syntax_error", "runtime_error", "input_error", "none"};
+        std::basic_string<char> _M_message;
+        std::basic_string<charT> _M_message_especification;
+        error_type _M_type;
+        uint8_t _M_id;
+
+    public:
+        explicit basic_regex_error() : std::exception(), _M_message(), _M_message_especification(), _M_type(error_type::_S_none), _M_id(0) {}
+        explicit basic_regex_error(const std::basic_string<char> &, error_type, uint8_t);
+        explicit basic_regex_error(const std::basic_string<char> &, size_t, const basic_string_range<charT> &, uint8_t);
+        explicit basic_regex_error(const std::basic_string<char> &, size_t, size_t, const basic_string_range<charT> &, uint8_t);
+        const char *what() const _GLIBCXX_TXN_SAFE_DYN _GLIBCXX_NOTHROW override { return _M_message.c_str(); }
+        const charT *especification() const _GLIBCXX_TXN_SAFE_DYN _GLIBCXX_NOTHROW { return _M_message_especification.c_str(); }
+        virtual ~basic_regex_error() _GLIBCXX_TXN_SAFE_DYN _GLIBCXX_NOTHROW {}
     };
 
-    regex_error::regex_error(const std::string &_message, myregex::error_type _type, unsigned char _code) : 
-    std::runtime_error(
-        "type: " + std::string(regex_error::_M_name_error_type[static_cast<unsigned char>(_type)]) + ":\n"
-        + _message + "\ncode: " + std::to_string(_code)
-    ), type(_type), code(_code) {}
+    using regex_error = basic_regex_error<char>;
+    using wregex_error = basic_regex_error<wchar_t>;
 
-    regex_error::regex_error(const std::string &_message, size_t _index, const stringrange &_regular_expresion, unsigned char _code) : 
-    std::runtime_error(
-        "\ntype: " + std::string(regex_error::_M_name_error_type[static_cast<unsigned char>(error_type::_S_syntax_error)]) + "\nmessage: "
-        + _message + regex_error::syntax_error_viewer(_regular_expresion, _index, _index) + "\ncode: " + std::to_string(_code)
-    ), type(error_type::_S_syntax_error), code(_code) {}
+    template <typename charT>
+    basic_regex_error<charT>::basic_regex_error(const std::basic_string<char> &message, error_type type, uint8_t id) : 
+    std::exception(), _M_message("type: " + std::string(basic_regex_error<charT>::_S_type_error[static_cast<uint8_t>(type)]) + ":\n" + message  + "\ncode: " + std::to_string(id)), _M_message_especification(), _M_type(type), _M_id(id) {}
+    
+    
+    template <typename charT>
+    basic_regex_error<charT>::basic_regex_error(const std::basic_string<char> &message, size_t _index, const basic_string_range<charT> &_regular_expresion, uint8_t id) : 
+    std::exception(), _M_message("type: " + std::string(basic_regex_error::_S_type_error[static_cast<uint8_t>(error_type::_S_syntax_error)]) + ":\n" + message  + "\ncode: " + std::to_string(id)), _M_message_especification(
+        basic_regex_error<charT>::_S_syntax_error_viewer(_regular_expresion, _index, _index)
+    ), _M_type(error_type::_S_syntax_error), _M_id(id) {}
 
-    regex_error::regex_error(const std::string &_message, size_t _index_a, size_t _index_b, const stringrange &_regular_expresion, unsigned char _code) : 
-    std::runtime_error(
-        "\ntype: " + std::string(regex_error::_M_name_error_type[static_cast<unsigned char>(error_type::_S_syntax_error)]) + "\nmessage: "
-        + _message + regex_error::syntax_error_viewer(_regular_expresion, _index_a, _index_b) + "\ncode: " + std::to_string(_code)
-    ), type(error_type::_S_syntax_error), code(_code) {}
+    template <typename charT>
+    basic_regex_error<charT>::basic_regex_error(const std::basic_string<char> &message, size_t _index_a , size_t _index_b, const basic_string_range<charT> &_regular_expresion, uint8_t id) : 
+    std::exception(), _M_message("type: " + std::string(basic_regex_error::_S_type_error[static_cast<uint8_t>(error_type::_S_syntax_error)]) + ":\n" + message  + "\ncode: " + std::to_string(id)), _M_message_especification(
+        basic_regex_error<charT>::_S_syntax_error_viewer(_regular_expresion, _index_a, _index_b)
+    ), _M_type(error_type::_S_syntax_error), _M_id(id) {}
 
-    std::string regex_error::syntax_error_viewer(const stringrange& range, size_t a, size_t b) {
-        std::string generate_spaces_and_mark = {};
-        stringrange::iterator minrange;
-        stringrange::iterator maxrange;
+    template <typename charT>
+    std::basic_string<charT> basic_regex_error<charT>::_S_syntax_error_viewer(const basic_string_range<charT> &expresion, size_t index_a, size_t index_b)
+    {
+        std::basic_string<charT> generate_spaces_and_mark = {};
+        typename basic_string_range<charT>::iterator minrange;
+        typename basic_string_range<charT>::iterator maxrange;
 
-        if (range.begin() == range.end())
-            return "";
+        if (expresion.begin() == expresion.end())
+            return {};
 
-        minrange = range.begin() + a;
-        maxrange = range.begin() + b;
+        minrange = expresion.begin() + index_a;
+        maxrange = expresion.begin() + index_b;
 
-        for (stringrange::iterator i = range.begin(); i != range.end(); i++)
+        for (typename basic_string_range<charT>::iterator i = expresion.begin(); i != expresion.end(); i++)
         {
-            if (*i == '\n')
-                generate_spaces_and_mark.push_back('\n');
-            else if(minrange <= i && i <= maxrange)
-                generate_spaces_and_mark.push_back('~');
+            if (*i == charT('\n'))
+                generate_spaces_and_mark.push_back(charT('\n'));
+            else if (minrange <= i && i <= maxrange)
+                generate_spaces_and_mark.push_back(charT('~'));
             else
-                generate_spaces_and_mark.push_back(' ');
+                generate_spaces_and_mark.push_back(charT(' '));
         }
-
-        return "\nincident:\n" + std::string(range.begin(), range.end()) + "\n" + generate_spaces_and_mark;
+        if constexpr (std::is_same_v<charT, char>)
+            return std::move("\nincident:\n" + std::basic_string<charT>(expresion.begin(), expresion.end()) + "\n" + generate_spaces_and_mark);
+        else 
+            return std::move(L"\nincident:\n" + std::basic_string<charT>(expresion.begin(), expresion.end()) + L"\n" + generate_spaces_and_mark);
     }
 } // namespace myregex
 

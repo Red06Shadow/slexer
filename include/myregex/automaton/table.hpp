@@ -1,12 +1,14 @@
 #ifndef _TABLEDFA
 #define _TABLEDFA
 
+#include <myregex/automaton/base/state.hpp>
+#include <utilities/memory.hpp>
+//<--...
 #include <corecrt.h>
 #include <type_traits>
 #include <iostream>
+#include <vector>
 #include <math.h>
-#include <myregex/utilities/selector.hpp>
-#include <myregex/automaton/base/state.hpp>
 
 #define DEBUG false
 
@@ -20,29 +22,60 @@ namespace myregex
     {
         static_assert(std::is_same_v<charT, char> || std::is_same_v<charT, wchar_t>, "Error: no se permiten tipos de datos que no sean de caracteres(solo char o wchar_t)");
 
-    private:
+    public:
         using Qtable = std::vector<myregex::state<idT>>;
-        using Transitions = size_t *;
+        using Transitions = std::basic_allocator<size_t>;
+
+    private:
         Qtable Q_table;
         Transitions Q_transitions;
-        inline static Transitions build(size_t);
-        inline static void copy(basic_table &, const basic_table &);
 
     public:
-        basic_table() : Q_transitions(nullptr), Q_table({}) {}
-        basic_table(const std::vector<myregex::state<idT>>&);
-        basic_table(std::vector<myregex::state<idT>>&&);
-        basic_table(const basic_table &);
-        basic_table(basic_table &&);
+        basic_table() : Q_transitions(), Q_table() {}
+        basic_table(const Qtable &_states, const Transitions &_transitions) : Q_transitions(_transitions), Q_table(_states) {}
+        basic_table(Qtable &&_states, Transitions &&_transitions) : Q_transitions(std::move(_transitions)), Q_table(std::move(_states)) {}
+        basic_table(const std::vector<myregex::state<idT>> &status) : Q_transitions(status.size() * myregex::basic_table<charT, idT>::dictionary), Q_table(status) {}
+        basic_table(std::vector<myregex::state<idT>> &&status) : Q_transitions(status.size() * myregex::basic_table<charT, idT>::dictionary), Q_table(std::move(status)) {}
+        basic_table(const basic_table &other) : Q_transitions(other.Q_transitions), Q_table(other.Q_table) {}
+        basic_table(basic_table &&other) : Q_transitions(std::move(other.Q_transitions)), Q_table(std::move(other.Q_table)) {}
         basic_table &operator=(const basic_table &);
         basic_table &operator=(basic_table &&);
-        inline const Qtable& status() const { return Q_table; }
+        inline const Qtable &status() const { return Q_table; }
         inline const Transitions &transitions() const { return Q_transitions; }
         inline static constexpr size_t dictionary = std::pow(256ULL, sizeof(charT));
-        inline size_t size() const { return Q_table.size() * myregex::basic_table<charT, idT>::dictionary * sizeof(size_t); }
-#if DEBUG
-        void view() const;
-#endif
+        inline size_t size() const { return Q_table.size() * myregex::basic_table<charT, idT>::dictionary * sizeof(size_t) + sizeof(Transitions); }
+        friend std::basic_ostream<charT> &operator<<(std::basic_ostream<charT> &out, basic_table<charT, idT> other)
+        {
+            out << charT('{');
+            for (size_t state = 0; state < other.Q_table.size(); state++)
+            {
+                if (other.Q_table[state].valid())
+                {
+                    if constexpr (std::is_enum_v<idT>)
+                        out << static_cast<size_t>(other.Q_table[state].get());
+                    else
+                        out << other.Q_table[state].get();
+                }
+                else
+                    out << charT('{') << charT('}');
+                out << charT((state >= other.Q_table.size() - 1ULL) ? '}' : ',');
+            }
+            out << charT(',') << std::endl
+                << charT('{');
+            for (size_t state = 0; state < other.Q_table.size(); state++)
+            {
+                for (size_t letter = 0; letter < myregex::basic_table<charT, idT>::dictionary; letter++)
+                {
+                    if constexpr (std::is_same_v<charT, char>)
+                        out << (long long)(other.Q_transitions[(state * myregex::basic_table<charT, idT>::dictionary) + letter]) << "ULL" << charT(',');
+                    else
+                        out << (long long)(other.Q_transitions[(state * myregex::basic_table<charT, idT>::dictionary) + letter]) << L"ULL" << charT(',');
+                }
+                out << std::endl;
+            }
+            out << charT('}');
+            return out;
+        }
         ~basic_table();
         friend basic_builder<charT, idT>;
     };
@@ -58,67 +91,12 @@ namespace myregex
 } // namespace myregex
 
 template <typename charT, typename idT>
-typename myregex::basic_table<charT, idT>::Transitions myregex::basic_table<charT, idT>::build(size_t nstates)
-{
-    myregex::basic_table<charT, idT>::Transitions transitions;
-    transitions = new size_t [nstates * myregex::basic_table<charT, idT>::dictionary];
-    // for (size_t state = 0; state < nstates; state++)
-    // {
-    //     transitions[state] = new size_t[myregex::basic_table<charT, idT>::dictionary];
-    //     for (size_t letter = 0; letter < myregex::basic_table<charT, idT>::dictionary; letter++)
-    //         transitions[state][letter] = -1ULL;
-    // }
-    return transitions;
-}
-
-template <typename charT, typename idT>
-void myregex::basic_table<charT, idT>::copy(myregex::basic_table<charT, idT> &destine, const myregex::basic_table<charT, idT> &sources)
-{
-    // destine.Q_transitions = new size_t *[sources.Q_table.size()];
-    destine.Q_transitions = new size_t [sources.Q_table.size() * myregex::basic_table<charT, idT>::dictionary];
-    for (size_t state = 0; state < sources.Q_table.size(); state++)
-    {
-        // destine.Q_transitions[state] = new size_t[myregex::basic_table<charT, idT>::dictionary];
-        for (size_t letter = 0; letter < myregex::basic_table<charT, idT>::dictionary; letter++)
-            destine.Q_transitions[(state * myregex::basic_table<charT, idT>::dictionary) + letter] = sources.Q_transitions[(state * myregex::basic_table<charT, idT>::dictionary) + letter];
-    }
-    destine.Q_table = sources.Q_table;
-}
-
-template <typename charT, typename idT>
-myregex::basic_table<charT, idT>::basic_table(const std::vector<myregex::state<idT>>& status) : Q_transitions(myregex::basic_table<charT, idT>::build(status.size())),
-                                                                              Q_table(status) { }
-template <typename charT, typename idT>
-myregex::basic_table<charT, idT>::basic_table(std::vector<myregex::state<idT>>&& status) : Q_transitions(myregex::basic_table<charT, idT>::build(status.size())),
-                                                                         Q_table(std::move(status)) {}
-
-template <typename charT, typename idT>
-myregex::basic_table<charT, idT>::basic_table(const myregex::basic_table<charT, idT> &other) : Q_transitions(nullptr),
-                                                                                     Q_table(other.Q_table)
-{
-    if (!other.Q_transitions)
-        throw std::runtime_error("error: empty basic_allocator in copy contructor: basic_allocator(const std::basic_allocator& other)");
-    myregex::basic_table<charT, idT>::copy(*this, other);
-}
-template <typename charT, typename idT>
-myregex::basic_table<charT, idT>::basic_table(myregex::basic_table<charT, idT> &&other) : Q_transitions(nullptr)
-{
-    if (other.Q_transitions)
-    {
-        Q_transitions = other.Q_transitions;
-        other.Q_transitions = nullptr;
-        Q_table = std::move(other.Q_table);
-    }
-}
-
-template <typename charT, typename idT>
 myregex::basic_table<charT, idT> &myregex::basic_table<charT, idT>::operator=(const basic_table &other)
 {
     if (&other != this)
     {
-        if (!other.Q_transitions)
-            throw std::runtime_error("error: empty basic_allocator in copy contructor: basic_allocator(const std::basic_allocator& other)");
-        myregex::basic_table<charT, idT>::copy(*this, other);
+        Q_transitions = other.Q_transitions;
+        Q_table = other.Q_table;
     }
     return *this;
 }
@@ -127,49 +105,12 @@ myregex::basic_table<charT, idT> &myregex::basic_table<charT, idT>::operator=(ba
 {
     if (&other != this)
     {
-        if (other.Q_transitions)
-        {
-            Q_transitions = other.Q_transitions;
-            other.Q_transitions = nullptr;
-            Q_table = std::move(other.Q_table);
-        }
+        Q_transitions = std::move(other.Q_transitions);
+        Q_table = std::move(other.Q_table);
     }
     return *this;
 }
-#if DEBUG
 template <typename charT, typename idT>
-void myregex::basic_table<charT, idT>::view() const
-{
-    std::selector<charT>::stream() << "Q_table: " << this->Q_table << std::endl
-               << "Q_transitions:" << std::endl
-               << '\t';
-
-    for (size_t letter = 0; letter < myregex::basic_table<charT, idT>::dictionary; letter++)
-        std::selector<charT>::stream() << charT(letter) << charT(' ');
-
-    std::selector<charT>::stream() << std::endl;
-
-    for (size_t state = 0; state < this->Q_table; state++)
-    {
-        std::selector<charT>::stream() << state << ":      ";
-        for (size_t letter = 0; letter < myregex::basic_table<charT, idT>::dictionary; letter++)
-            std::selector<charT>::stream() << (long long)(this->Q_transitions[state][letter]) << charT(' ');
-        std::selector<charT>::stream() << std::endl;
-    }
-}
-#endif
-template <typename charT, typename idT>
-myregex::basic_table<charT, idT>::~basic_table()
-{
-    if (this->Q_transitions != nullptr)
-    {
-        // for (size_t state = 0; state < Q_table.size(); state++)
-        //     if (Q_transitions[state] != nullptr)
-        //         delete[] Q_transitions[state];
-        // delete[] Q_transitions;
-        delete[] Q_transitions;
-        Q_transitions = nullptr;
-    }
-}
-
+myregex::basic_table<charT, idT>::~basic_table() {}
+//<--...
 #endif

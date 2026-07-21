@@ -29,7 +29,6 @@ namespace slexer
             myregex::basic_table<charT,
                                typename slexer::basic_lexer<charT, idT>::_I_idT>>
             _M_group_tables;
-        // std::vector<slexer::basic_lexer::handle> _M_handles;
         unsigned int _M_buffer_size;
 
     public:
@@ -60,7 +59,7 @@ namespace slexer
         std::vector<std::pair<typename slexer::basic_lexer<charT, idT>::_I_idT, std::string>> regexs;
         regexs.reserve(_M_rules.size());
         for (auto &&[_id, _regex, _funtion] : _M_rules)
-            regexs.push_back({{_id, _funtion}, _regex});
+            regexs.push_back({typename slexer::basic_lexer<charT, idT>::_I_idT(_id, _funtion), _regex});
 
         _M_regex_reference.push_back(
             myregex::basic_builder<charT, typename slexer::basic_lexer<charT, idT>::_I_idT>::build_table(

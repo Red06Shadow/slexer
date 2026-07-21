@@ -1,6 +1,6 @@
 #ifndef SLEXERBUFFER
 #define SLEXERBUFFER
-
+//<--...
 #include <stdexcept>
 #include <iostream>
 #include <fstream>
@@ -115,5 +115,5 @@ namespace slexer
             delete[] _M_buffer;
     }
 } // namespace slexer
-
+//<--...
 #endif

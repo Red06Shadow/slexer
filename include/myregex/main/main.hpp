@@ -6,8 +6,8 @@
 #include <myregex/automaton/nfa.hpp>
 #include <myregex/automaton/dfa.hpp>
 #include <myregex/automaton/table.hpp>
-#include <myregex/utilities/range.hpp>
-#include <myregex/utilities/selector.hpp>
+#include <utilities/range.hpp>
+#include <utilities/selector.hpp>
 #include <myregex/exceptions/error.hpp>
 
 namespace myregex
@@ -153,9 +153,8 @@ namespace myregex
         inline myregex::caption<charT, idT> match(basic_string_range<charT> &range) const;
 
         inline size_t size() const;
-#if DEBUG
-        inline void view() const;
-#endif
+        inline void export_automaton(std::basic_ostream<charT>& out) const;
+        inline void view() const { export_automaton(std::selector<charT>::stream()); }
     };
 
     template <typename idT>
@@ -274,7 +273,7 @@ namespace myregex
         if constexpr (option == myregex::constants::match_options::_S_maximun_sequence)
             return myregex::caption<charT, idT>(_M_string, id);
         else if constexpr (option == myregex::constants::match_options::_S_first_sequence)
-            return myregex::caption<charT, idT>({}, -1ULL);
+            return myregex::caption<charT, idT>({}, {});
     }
 
     template <typename charT, typename idT>
@@ -311,7 +310,7 @@ namespace myregex
         if constexpr (option == myregex::constants::match_options::_S_maximun_sequence)
             return myregex::caption<charT, idT>(_M_string, id);
         else if constexpr (option == myregex::constants::match_options::_S_first_sequence)
-            return myregex::caption<charT, idT>({}, -1ULL);
+            return myregex::caption<charT, idT>({}, {});
     }
     template <typename charT, typename idT>
     template <myregex::constants::match_options option>
@@ -347,7 +346,7 @@ namespace myregex
         if constexpr (option == myregex::constants::match_options::_S_maximun_sequence)
             return myregex::caption<charT, idT>(_M_string, id);
         else if constexpr (option == myregex::constants::match_options::_S_first_sequence)
-            return myregex::caption<charT, idT>({}, -1ULL);
+            return myregex::caption<charT, idT>({}, {});
     }
 
     template <typename charT, typename idT>
@@ -386,17 +385,15 @@ namespace myregex
             else
                 return 0; }, _M_expresions);
     }
-#if DEBUG
     template <typename charT, typename idT>
-    void basic_regex<charT, idT>::view() const
-    {
-        std::visit([](auto &&value) -> void
+    void basic_regex<charT, idT>::export_automaton(std::basic_ostream<charT>& out) const {
+        std::visit([&out](auto &&value) -> void
                    {
             using type = std::decay_t<decltype(value)>;
             if constexpr (std::is_same_v<type, basic_nfa<charT, idT>> || std::is_same_v<type, basic_dfa<charT, idT>> || std::is_same_v<type, basic_table<charT, idT>>)
-                value.view(); }, _M_expresions);
+                out << value; 
+            }, _M_expresions);
     }
-#endif
 } // namespace myregex
 
 #endif

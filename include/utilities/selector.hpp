@@ -1,6 +1,6 @@
 #ifndef MYREGEXSELECTOR
 #define MYREGEXSELECTOR
-
+//<--...
 #include <iostream>
 
 namespace std
@@ -22,5 +22,6 @@ namespace std
         static inline streamtype &stream() { return std::wcout; }
     };
 } // namespace std
+//<--...
 
 #endif
