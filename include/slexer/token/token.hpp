@@ -16,6 +16,7 @@ namespace slexer
         std::basic_string<charT> _M_text;
         idT _M_id;
         size_t _M_line, _M_position, _M_column;
+        inline void _M_set_localete(size_t _line, size_t _column, size_t _position) { _M_line =_line; _M_position = _position; _M_column = _column; }
 
     public:
         basic_token() : _M_text(), _M_id(), _M_line(0), _M_position(0), _M_column(0) {}

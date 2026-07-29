@@ -7,40 +7,17 @@
 #include <slexer/token/token.hpp>
 #include <slexer/tokenstream/tokenstream.hpp>
 #include <slexer/exceptions/exceptions.hpp>
+#include <utilities/selector.hpp>
 //<--...
 #include <iostream>
 #include <fstream>
 #include <filesystem>
 #include <queue>
 
-
 namespace slexer
 {
     template <typename charT, typename idT>
     class basic_builder;
-
-    enum class Flags : unsigned int
-    {
-        _S_emit_error = 0x0001,
-        _S_emit_token = 0x0002,
-        _S_push_capture = 0x0004,
-
-    };
-    _GLIBCXX_NODISCARD _GLIBCXX_CONSTEXPR inline Flags
-    operator&(Flags __a, Flags __b) _GLIBCXX_NOTHROW { return Flags(static_cast<unsigned int>(__a) & static_cast<unsigned int>(__b)); }
-    _GLIBCXX_NODISCARD _GLIBCXX_CONSTEXPR inline Flags
-    operator|(Flags __a, Flags __b) _GLIBCXX_NOTHROW { return Flags(static_cast<unsigned int>(__a) | static_cast<unsigned int>(__b)); }
-    _GLIBCXX_NODISCARD _GLIBCXX_CONSTEXPR inline Flags
-    operator^(Flags __a, Flags __b) _GLIBCXX_NOTHROW { return Flags(static_cast<unsigned int>(__a) ^ static_cast<unsigned int>(__b)); }
-    _GLIBCXX14_CONSTEXPR
-    inline const Flags &
-    operator&=(Flags &__a, Flags __b) _GLIBCXX_NOTHROW { return __a = __a & __b; }
-    _GLIBCXX14_CONSTEXPR
-    inline const Flags &
-    operator|=(Flags &__a, Flags __b) _GLIBCXX_NOTHROW { return __a = __a | __b; }
-    _GLIBCXX14_CONSTEXPR
-    inline const Flags &
-    operator^=(Flags &__a, Flags __b) _GLIBCXX_NOTHROW { return __a = __a ^ __b; }
 
     template <typename charT, typename idT>
     class basic_lexer
@@ -52,44 +29,99 @@ namespace slexer
         private:
             /// @brief Inicio de tabla
             size_t _M_begin;
-            Flags _M_flags;
-            size_t _M_size_group;
+            /// @brief Tamano del grupo de tablas
+            size_t _M_gsize;
+            /// @brief Captura
+            slexer::basic_token<charT, idT> _M_capture;
+            /// @brief Queue
+            std::queue<slexer::basic_token<charT, idT>> _M_queue;
+            /// @brief Cadena de tokens
+            slexer::basic_tokenstream<charT, idT> &_M_tokenstream;
+            /// @brief Buffer
+            slexer::basic_buffer<charT> &_M_buffer;
 
         public:
-            slexer::basic_token<charT, idT> _capture;
-            std::queue<slexer::basic_token<charT, idT>> _queue_emit;
-
-        public:
-            master(size_t _group_size, size_t _buffer_size) : _M_size_group(_group_size), _M_begin(0), _M_flags(Flags::_S_emit_token | Flags::_S_push_capture) { _capture._M_text.reserve(_buffer_size); }
+            /// @brief Constructor por defecto
+            /// @param _gsize Tamano del grupo de tablas
+            /// @param _tokenstream Cadena de tokens
+            /// @param _buffer Buffer
+            master(size_t _gsize, slexer::basic_tokenstream<charT, idT> &_tokenstream, slexer::basic_buffer<charT> &_buffer)
+                : _M_gsize(_gsize), _M_begin(0), _M_tokenstream(_tokenstream), _M_buffer(_buffer)
+            {
+                _M_capture._M_text.reserve(_buffer.max());
+            }
+            /// @brief Restuarua el inicio a la tabla principal
+            inline void begin() { _M_begin = 0; }
+            /// @brief Cambia el inicio a la posicion de la tabla deseada
+            /// @param _begin Posicion de inicio
             inline void begin(size_t _begin)
             {
-                if (_begin >= _M_size_group)
-                    throw slexer::critical_error("no access to grupo over-size to table", 1);
+                if (_begin >= _M_gsize)
+                    throw slexer::critical_error(1, "no access to grupo over-size to table");
                 _M_begin = _begin;
             }
-            inline void setflag(Flags _flag)
+            /// @brief Emite el token a la cadena de tokens
+            inline void emit() { _M_tokenstream.push(_M_capture); }
+            /// @brief Emite el token con un numero menor de caracteres a la cadena de tokens
+            /// @param _less Numero de reduccion de caractres
+            inline void emit(uint32_t _less)
             {
-                if (!(unsigned int)(_flag & _M_flags))
-                    _M_flags ^= _flag;
+                if (_less > _M_capture.text().size())
+                    _less = _M_capture.text().size();
+                _M_capture.text().resize(_M_capture.text().size() - _less);
+                _M_buffer.move(-_less);
+                _M_tokenstream.push(_M_capture);
             }
-            inline void unsetflag(Flags _flag)
+            /// @brief Cambia el token con una cadena modificada
+            /// @param _str Cadena a insertar
+            inline void change(const std::basic_string<char> &_str)
             {
-                if ((unsigned int)(_flag & _M_flags))
-                    _M_flags ^= _flag;
+                _M_capture._M_text = _str;
+                _M_tokenstream.push(_M_capture);
             }
-            inline bool getflag(Flags _flag)
+            /// @brief Cambia el token con una cadena e id modificada
+            /// @param _str Cadena a insertar
+            /// @param _id Id deseado
+            inline void change(const std::basic_string<char> &_str, idT _id)
             {
-                return (unsigned int)(_flag & _M_flags);
+                _M_capture._M_text = _str;
+                _M_capture._M_id = _id;
+                _M_tokenstream.push(_M_capture);
             }
+            /// @brief Vacia la cola de capturas pendientes
+            inline void pull()
+            {
+                while (!_M_queue.empty())
+                {
+                    _M_tokenstream.push(std::move(_M_queue.front()));
+                    _M_queue.pop();
+                }
+            }
+            /// @brief Vacia un numero especifico de capturas de la cola de pendientes
+            /// @param _elements Cantidad de elementos a vaciar
+            inline void pull(size_t _elements)
+            {
+                while (!_M_queue.empty() && _elements < _M_queue.size())
+                {
+                    _M_tokenstream.push(std::move(_M_queue.front()));
+                    _M_queue.pop();
+                }
+            }
+            /// @brief Obtiene la cola
+            /// @return Cola de elementos de capturas
+            inline std::queue<slexer::basic_token<charT, idT>> &queue() { return _M_queue; }
+            /// @brief Obtiene la captura constante
+            /// @return captura del lexer
+            inline const slexer::basic_token<charT, idT> &capture() const { return _M_capture; }
             friend basic_lexer;
         };
 
         /// @brief Patron de la funcion de captura
         typedef void (*handle)(basic_lexer<charT, idT>::master &);
-        /// @brief Valor por defecto de inicio
-        inline static constexpr size_t main = 0;
-        /// @brief Funcion de captura por defecto
-        static inline constexpr basic_lexer<charT, idT>::handle defaultf = [](basic_lexer<charT, idT>::master &) -> void {};
+/// @brief Funcion de captura por defecto
+#define defaultf(_charT, _idT) [](slexer::basic_lexer<_charT, _idT>::master &m) -> void { m.emit(); }
+/// @brief Hanlde de definicion rapida
+#define slexerf(_charT, _idT, _nmaster) [](slexer::basic_lexer<_charT, _idT>::master & _nmaster)->void
 
     public:
         class _I_idT
@@ -104,11 +136,7 @@ namespace slexer
             inline idT id() const { return _M_id; }
             inline handle funt() const { return _M_handle; }
             friend bool operator<(const _I_idT &lhs, const _I_idT &rhs) { return lhs._M_id < rhs._M_id; }
-            friend std::ostream &operator<<(std::ostream &out, const _I_idT &element)
-            {
-                // out << _M_association_id;
-                return out;
-            }
+            friend std::ostream &operator<<(std::ostream &out, const _I_idT &element) { return out; }
             ~_I_idT() {}
         };
 
@@ -126,42 +154,37 @@ namespace slexer
         size_t _M_capture_column;
 
     private: /// @brief Funciones privadass
-        /// @brief
-        /// @param
-        /// @param
-        /// @param
-        void _M_caption(std::basic_ifstream<charT> &, master &, basic_lexer::handle &);
-        void _M_caption(typename std::basic_string<charT>::const_iterator &, const typename std::basic_string<charT>::const_iterator &, master &, basic_lexer::handle &);
+        /// @brief Captura de token por fichero
+        bool _M_caption(std::basic_ifstream<charT> &, master &, basic_lexer::handle &);
+        /// @brief Comprueba si ese estadio es de aceptacion
+        inline bool _M_acceptance_states(const master &, _I_idT&, size_t, size_t&);
         /// @brief Contador de posicion de archivo
-        /// @param letter caracter actual
-        inline void _M_manager_position(charT letter);
+        inline void _M_manager_position(charT);
         constexpr inline static size_t _S_value(charT caracter)
         {
             size_t value;
             if constexpr (std::is_same_v<charT, char>)
-                return (unsigned char)(caracter);
+                return (uint8_t)(caracter);
             else
             {
                 if constexpr (sizeof(wchar_t) == 2)
-                    return (unsigned short)(caracter);
+                    return (uint16_t)(caracter);
                 else
-                    return (unsigned int)(caracter);
+                    return (uint32_t)(caracter);
             }
         }
 
     public:
-        /// @brief
-        /// @param group
-        /// @param size_buffer
+        /// @brief Constructor base del lexer
+        /// @param group Grupo de tablas de expresiones regulares
+        /// @param size_buffer tamano del buffer
         basic_lexer(std::basic_allocator<myregex::basic_table<charT, _I_idT>> &&group, unsigned int size_buffer)
             : _M_group_tables(std::move(group)),
               _M_buffer_input(size_buffer),
               _M_capture_line(0),
               _M_capture_column(0),
               _M_capture_position(0) {}
-        /// @brief
-        /// @param other
-        basic_lexer(const basic_lexer<charT, idT> &other) = delete;
+        basic_lexer(const basic_lexer<charT, idT> &) = delete;
 
         /// @brief Constructor de movimiento base
         /// @param other otro objecto basic_lexer
@@ -172,21 +195,10 @@ namespace slexer
               _M_capture_column(other._M_capture_column),
               _M_capture_position(other._M_capture_position) {}
 
-        /// @brief
-        /// @param other
-        /// @return
-        basic_lexer<charT, idT> &operator=(const basic_lexer<charT, idT> &other) = delete;
-
-        /// @brief
-        /// @param other
-        /// @return
-        basic_lexer<charT, idT> &operator=(basic_lexer<charT, idT> &&other);
-
-        /// @brief
-        /// @return
-        slexer::basic_tokenstream<charT, idT> tokenize(std::basic_ifstream<charT> &_M_stream);
-
-        slexer::basic_tokenstream<charT, idT> tokenize(const std::basic_string<charT> &_M_stream);
+        basic_lexer<charT, idT> &operator=(const basic_lexer<charT, idT> &) = delete;
+        basic_lexer<charT, idT> &operator=(basic_lexer<charT, idT> &&);
+        slexer::basic_tokenstream<charT, idT> tokenize(std::basic_ifstream<charT> &);
+        slexer::basic_tokenstream<charT, idT> tokenize(const std::basic_string<charT> &);
 
         size_t size() const
         {
@@ -196,7 +208,13 @@ namespace slexer
             return size_;
         }
 
-        void compiler(const std::filesystem::path &path);
+        void view()
+        {
+            for (size_t i = 0; i < _M_group_tables.size(); i++)
+                std::selector<charT>::stream() << _M_group_tables[i];
+        }
+
+        void view(size_t i) { std::selector<charT>::stream() << _M_group_tables[i]; }
 
         friend basic_builder<charT, idT>;
     };
@@ -225,146 +243,76 @@ namespace slexer
         }
         this->_M_capture_position++;
     }
+
     template <typename charT, typename idT>
-    void basic_lexer<charT, idT>::_M_caption(std::basic_ifstream<charT> &_M_stream, master &_M_master, basic_lexer<charT, idT>::handle &_M_handle)
+    bool basic_lexer<charT, idT>::_M_acceptance_states(const master &_M_master, _I_idT& id, size_t status, size_t& ultimate_acceptance) {
+        if (_M_group_tables[_M_master._M_begin].status()[status].valid())
+        {
+            ultimate_acceptance = status;
+            id = _M_group_tables[_M_master._M_begin].status()[status].get();
+            return true;
+        }
+        return false;
+    }
+
+    template <typename charT, typename idT>
+    bool basic_lexer<charT, idT>::_M_caption(std::basic_ifstream<charT> &_M_stream, master &_M_master, basic_lexer<charT, idT>::handle &_M_handle)
     {
-        bool acceptance = false;
+        bool acceptance;
         size_t status = 0;
-        size_t acceptance_status = -1ULL;
+        size_t ultimate_acceptance = -1ULL;
         _I_idT id{};
+        charT letter;
         std::basic_string<charT> str{};
+        acceptance = _M_acceptance_states(_M_master, id, status, ultimate_acceptance);
         while (_M_buffer_input.position() < _M_buffer_input.size())
         {
-            charT letter = _M_buffer_input.peak();
+            letter = _M_buffer_input.peak();
             size_t next = _M_group_tables[_M_master._M_begin].transitions()[status * myregex::basic_table<charT, _I_idT>::dictionary + _S_value(letter)];
             if (next == -1ULL)
                 break; // No hay transición, rechazar
             status = next;
-            str.push_back(letter);
-            if (status == acceptance_status)
-                goto _M_jump_if_status_is_acceptance;
-            else if (_M_group_tables[_M_master._M_begin].status()[status].valid())
-            {
-                acceptance_status = status;
-                id = _M_group_tables[_M_master._M_begin].status()[status].get();
-                acceptance = true;
-            }
-        _M_jump_if_status_is_acceptance:
-            _M_buffer_input.next();
+            if (status != ultimate_acceptance)
+                acceptance = _M_acceptance_states(_M_master, id, status, ultimate_acceptance);
             _M_manager_position(letter);
+            str.push_back(letter);
+            _M_buffer_input.next();
             if (_M_buffer_input.position() >= _M_buffer_input.size() && !_M_buffer_input.eof())
                 _M_stream >> _M_buffer_input;
         }
-        _M_master._capture._M_text = std::move(str);
-        _M_master._capture._M_id = id.id();
+        _M_master._M_capture._M_text = std::move(str);
+        _M_master._M_capture._M_id = id.id();
         if (acceptance)
             _M_handle = id.funt();
         else
-            _M_master.setflag(Flags::_S_emit_error);
+            if (_M_master._M_capture._M_text.empty()) _M_master._M_capture._M_text.push_back(letter);
+        return acceptance;
     }
     template <typename charT, typename idT>
     slexer::basic_tokenstream<charT, idT> basic_lexer<charT, idT>::tokenize(std::basic_ifstream<charT> &_M_stream)
     {
         slexer::basic_tokenstream<charT, idT> _M_basic_tokenstream;
-        master _M_master{_M_group_tables.size(), _M_buffer_input.size()};
+        slexer::basic_lexer<charT, idT>::master _M_master = slexer::basic_lexer<charT, idT>::master(_M_group_tables.size(), _M_basic_tokenstream, _M_buffer_input);
         _M_stream >> _M_buffer_input;
         while (_M_buffer_input.position() < _M_buffer_input.size())
         {
             handle _M_handle = nullptr;
-            _M_master._capture._M_position = _M_capture_position;
-            _M_master._capture._M_line = _M_capture_line;
-            _M_master._capture._M_column = _M_capture_column;
-            basic_lexer::_M_caption(_M_stream, _M_master, _M_handle);
-            if (_M_master.getflag(Flags::_S_emit_error))
+            _M_master._M_capture._M_set_localete(_M_capture_line, _M_capture_column, _M_capture_position);
+            try
             {
-                if constexpr (std::is_same_v<charT, char>)
-                    throw slexer::basic_lexical_error<charT, idT>("token inseperado o mal formado", _M_master._capture);
-                else
-                    throw slexer::basic_lexical_error<charT, idT>(L"token inseperado o mal formado", _M_master._capture);
+                if (!basic_lexer::_M_caption(_M_stream, _M_master, _M_handle))
+                    throw slexer::basic_lexical_error<charT, idT>(0, "unesxpect token", _M_master._M_capture, default_hanlde_excpetion<charT, idT>);
+                // throw slexer::critical_error(2, "don't define rule to caprture lexeme error.");
+                if (_M_handle == nullptr)
+                    continue;
+                _M_handle(_M_master);
             }
-            if (_M_handle == nullptr)
-                continue;
-            _M_handle(_M_master);
-            if (_M_master.getflag(Flags::_S_push_capture))
-                _M_master._queue_emit.push(_M_master._capture);
-            if (!_M_master.getflag(Flags::_S_emit_token))
-                continue;
-            while (!_M_master._queue_emit.empty())
+            catch (const slexer::basic_lexical_error<charT, idT> &e)
             {
-                _M_basic_tokenstream.push(std::move(_M_master._queue_emit.front()));
-                _M_master._queue_emit.pop();
-            }
-        }
-        return _M_basic_tokenstream;
-    }
-
-    template <typename charT, typename idT>
-    void basic_lexer<charT, idT>::_M_caption(typename std::basic_string<charT>::const_iterator &_M_string, const typename std::basic_string<charT>::const_iterator &_M_end, master &_M_master, basic_lexer::handle &_M_handle)
-    {
-        bool acceptance = false;
-        size_t status = 0;
-        size_t acceptance_status = -1ULL;
-        _I_idT id{};
-        std::basic_string<charT> str{};
-        while (_M_string < _M_end)
-        {
-            charT letter = *_M_string;
-            size_t next = _M_group_tables[_M_master._M_begin].transitions()[status * myregex::basic_table<charT, _I_idT>::dictionary + _S_value(letter)];
-            if (next == -1ULL)
-                break; // No hay transición, rechazar
-            status = next;
-            str.push_back(letter);
-            if (status == acceptance_status)
-                goto _M_jump_if_status_is_acceptance;
-            else if (_M_group_tables[_M_master._M_begin].status()[status].valid())
-            {
-                acceptance_status = status;
-                id = _M_group_tables[_M_master._M_begin].status()[status].get();
-                acceptance = true;
-            }
-        _M_jump_if_status_is_acceptance:
-            _M_string++;
-            _M_manager_position(letter);
-        }
-        _M_master._capture._M_text = std::move(str);
-        _M_master._capture._M_id = id.id();
-        if (acceptance)
-            _M_handle = id.funt();
-        else
-            _M_master.setflag(Flags::_S_emit_error);
-    }
-
-    template <typename charT, typename idT>
-    slexer::basic_tokenstream<charT, idT> basic_lexer<charT, idT>::tokenize(const std::basic_string<charT> &_M_stream)
-    {
-        slexer::basic_tokenstream<charT, idT> _M_basic_tokenstream;
-        master _M_master{_M_group_tables.size(), 80};
-        typename std::basic_string<charT>::const_iterator it = _M_stream.begin();
-        while (it < _M_stream.end())
-        {
-            handle _M_handle = nullptr;
-            _M_master._capture._M_position = _M_capture_position;
-            _M_master._capture._M_line = _M_capture_line;
-            _M_master._capture._M_column = _M_capture_column;
-            basic_lexer::_M_caption(it, _M_stream.end(), _M_master, _M_handle);
-            if (_M_master.getflag(Flags::_S_emit_error))
-            {
-                if constexpr (std::is_same_v<charT, char>)
-                    throw slexer::basic_lexical_error<charT, idT>("token inseperado o mal formado", _M_master._capture);
-                else
-                    throw slexer::basic_lexical_error<charT, idT>(L"token inseperado o mal formado", _M_master._capture);
-            }
-            if (_M_handle == nullptr)
-                continue;
-            _M_handle(_M_master);
-            if (_M_master.getflag(Flags::_S_push_capture))
-                _M_master._queue_emit.push(_M_master._capture);
-            if (!_M_master.getflag(Flags::_S_emit_token))
-                continue;
-            while (!_M_master._queue_emit.empty())
-            {
-                _M_basic_tokenstream.push(std::move(_M_master._queue_emit.front()));
-                _M_master._queue_emit.pop();
+                size_t tll = _M_stream.tellg();
+                std::cerr << e.what() << std::endl;
+                std::selector<charT>::stream() << e.especification(_M_stream) << std::endl;
+                _M_stream.seekg(tll + 1);
             }
         }
         return _M_basic_tokenstream;

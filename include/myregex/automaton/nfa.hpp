@@ -94,7 +94,7 @@ namespace myregex
                 else
                     out  << L'L' << L'\'' << *it << L'\'';
             }
-            out << charT('}');
+            out << charT('}') << std::endl;
             return out;
         }
         size_t size() const;

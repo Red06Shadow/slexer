@@ -288,15 +288,7 @@ namespace myregex
         {
             charT letter = *range.peak();
             auto transition = _dfa.transitions().find({status, letter});
-            if (transition == _dfa.transitions().end())
-                break; // No hay transición, rechazar
-            status = transition->second;
-            _M_string.push_back(letter);
-            if (status == acceptance_status)
-            {
-                range.next();
-                continue;
-            }
+            if (status == acceptance_status);// Agregue esta condicional para que si el estado actual es igual a un estado de aceptacion(casos como * o +) automaticamente evite la comprobacion
             else if (_dfa.status()[status].valid())
             {
                 acceptance_status = status;
@@ -305,6 +297,10 @@ namespace myregex
                 else if constexpr (option == myregex::constants::match_options::_S_maximun_sequence)
                     id = _dfa.status()[acceptance_status].get();
             }
+            if (transition == _dfa.transitions().end())
+                break; // No hay transición, rechazar
+            status = transition->second;
+            _M_string.push_back(letter);
             range.next();
         }
         if constexpr (option == myregex::constants::match_options::_S_maximun_sequence)
@@ -324,15 +320,7 @@ namespace myregex
         {
             charT letter = *range.peak();
             size_t next_state = _table.transitions()[(status * _table.dictionary) + myregex::basic_builder<charT, idT>::_S_transition(letter)];
-            if (next_state == -1ULL)
-                break; // No hay transición, rechazar
-            status = next_state;
-            _M_string.push_back(letter);
-            if (status == acceptance_status)
-            {
-                range.next();
-                continue;
-            }
+            if (status == acceptance_status);
             else if (_table.status()[status].valid())
             {
                 acceptance_status = status;
@@ -341,6 +329,10 @@ namespace myregex
                 else if constexpr (option == myregex::constants::match_options::_S_maximun_sequence)
                     id = _table.status()[acceptance_status].get();
             }
+            if (next_state == -1ULL)
+                break; // No hay transición, rechazar
+            status = next_state;
+            _M_string.push_back(letter);
             range.next();
         }
         if constexpr (option == myregex::constants::match_options::_S_maximun_sequence)

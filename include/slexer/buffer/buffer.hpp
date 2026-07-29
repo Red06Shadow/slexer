@@ -4,6 +4,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <fstream>
+#include <stdint.h>
 
 namespace slexer
 {
@@ -13,22 +14,24 @@ namespace slexer
     private:
         CharT *_M_buffer;
         bool _M_is_eof;
-        unsigned int _M_size_allocator;
-        unsigned int _M_size_string;
-        unsigned int _M_position;
+        uint32_t _M_size_allocator;
+        uint32_t _M_size_string;
+        uint32_t _M_position;
 
     public:
         basic_buffer() : _M_buffer(nullptr), _M_is_eof(true), _M_size_allocator(0), _M_size_string(0), _M_position(0) {}
-        basic_buffer(unsigned int _max) : _M_buffer(new CharT[_max + 1]), _M_is_eof(false), _M_size_allocator(_max), _M_size_string(_max), _M_position(0) {}
+        basic_buffer(uint32_t _max) : _M_buffer(new CharT[_max + 1]), _M_is_eof(false), _M_size_allocator(_max), _M_size_string(_max), _M_position(0) {}
         basic_buffer(const basic_buffer<CharT> &other);
         basic_buffer(basic_buffer<CharT> &&other) noexcept;
         basic_buffer<CharT> &operator=(const basic_buffer<CharT> &other);
         basic_buffer<CharT> &operator=(basic_buffer<CharT> &&other) noexcept;
 
         inline bool eof() const { return _M_is_eof; }
-        inline unsigned int position() const { return _M_position; }
-        inline unsigned int size() const { return _M_size_string; }
-        inline unsigned int max() const { return _M_size_allocator; }
+        inline uint32_t position() const { return _M_position; }
+        inline const CharT const * iterator() const { return _M_buffer + _M_position; }
+        inline void move(uint32_t _position) { _M_position += _position; }
+        inline uint32_t size() const { return _M_size_string; }
+        inline uint32_t max() const { return _M_size_allocator; }
 
         inline bool isbegin() const { return !_M_position; }
         inline bool isend() const { return _M_position >= _M_size_string; }
@@ -37,13 +40,11 @@ namespace slexer
         inline const CharT* buffer() const { return _M_buffer; }
 #endif
 
-        std::iterator_traits<CharT> begin() const { return std::iterator_traits<CharT>(_M_buffer); }
-        std::iterator_traits<CharT> end() const { return std::iterator_traits<CharT>(_M_buffer + _M_size_string); }
+        const CharT* begin() const { return _M_buffer; }
+        const CharT* end() const { return _M_buffer + _M_size_string; }
 
         inline CharT next() { return (isend() ? CharT(0) : _M_buffer[_M_position++]); }
         inline CharT peak() { return (isend() ? CharT(0) : _M_buffer[_M_position]); }
-
-        
 
         friend std::basic_ifstream<CharT>& operator>>(std::basic_ifstream<CharT>& in, basic_buffer<CharT>& data) {
             in.read(data._M_buffer, data.max());
@@ -51,6 +52,7 @@ namespace slexer
             data._M_size_string = in.gcount();
             data._M_buffer[data._M_size_string] = 0;
             data._M_position = 0;
+            in.clear();
             return in;
         }
         friend std::basic_ostream<CharT>& operator<<(std::basic_ostream<CharT>& out, const basic_buffer<CharT>& data) {
@@ -71,7 +73,7 @@ namespace slexer
         this->_M_position = other._M_position;
         this->_M_size_string = other._M_size_string;
         this->_M_is_eof = other._M_is_eof;
-        for (unsigned int i = 0; i < this->_M_size_string; i++)
+        for (uint32_t i = 0; i < this->_M_size_string; i++)
             this->_M_buffer[i] = other._M_buffer[i];
     }
     template <typename CharT>
@@ -89,7 +91,7 @@ namespace slexer
             this->_M_position = other._M_position;
             this->_M_size_string = other._M_size_string;
             this->_M_is_eof = other._M_is_eof;
-            for (unsigned int i = 0; i < this->_M_size_string; i++)
+            for (uint32_t i = 0; i < this->_M_size_string; i++)
                 this->_M_buffer[i] = other._M_buffer[i];
         }
         return *this;

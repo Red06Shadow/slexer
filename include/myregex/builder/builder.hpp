@@ -406,9 +406,9 @@ namespace myregex
                 range.next();
                 if (b == charT('\\'))
                     b = basic_builder<charT, idT>::_S_parser_code_caracter(range);
-                if (b <= a)
+                if (_S_transition(b) <= _S_transition(a))
                     throw myregex::basic_regex_error<charT>("range whit min greather than max in this class", position_start_range, range.position(offset), range, 10);
-                for (size_t i = a; i <= b; i++)
+                for (size_t i = _S_transition(a); i <= _S_transition(b); i++)
                     alphabet.insert(charT(i));
             }
         }
