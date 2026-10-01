@@ -14,6 +14,7 @@ namespace slexer
             slexer::basic_buffer<charT> _M_buffer;
             std::shared_ptr<_S_node> _M_back;
             _S_node(size_t size, std::shared_ptr<_S_node>&& back) : _M_buffer(size), _M_back(std::move(back)) {}
+            _S_node(const std::basic_string<charT>& str, std::shared_ptr<_S_node>&& back) : _M_buffer(str), _M_back(std::move(back)) {}
         };
         std::shared_ptr<_S_node> _M_iterator;
         size_t _M_size;
@@ -28,6 +29,15 @@ namespace slexer
                 _M_iterator = std::make_shared<_S_node>(size, std::move(_M_iterator));
             _M_size++;
         }
+        void push(const std::basic_string<charT>& str)
+        {
+            if (_M_iterator.get() == nullptr)
+                _M_iterator = std::make_shared<_S_node>(_S_node(str, nullptr));
+            else
+                _M_iterator = std::make_shared<_S_node>(size, std::move(_M_iterator));
+            _M_size++;
+        }
+    
         inline slexer::basic_buffer<charT> &top()
         {
             if (_M_size == 0)

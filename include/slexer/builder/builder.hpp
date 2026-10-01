@@ -43,12 +43,7 @@ namespace slexer
             basic_builder<charT, idT>::_S_option(_M_group_tables, rules);
             return *this;
         }
-        basic_builder<charT, idT> &buffer(unsigned int size)
-        {
-            _M_buffer_size = size;
-            return *this;
-        }
-        basic_lexer<charT, idT> build() { return basic_lexer<charT, idT>(_M_group_tables, _M_buffer_size); }
+        basic_lexer<charT, idT> build() { return basic_lexer<charT, idT>(_M_group_tables); }
         ~basic_builder() {}
     };
     template <typename charT, typename idT>

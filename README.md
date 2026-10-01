@@ -13,7 +13,7 @@ It should be noted that there are still things to improve, mainly the constructi
 
 // Here the character type to handle and the identifier for each rule are specified; it can be an unsigned integer or an enum class
 slexer::basic_lexer<char, size_t> _lexer = slexer::basic_builder<char, size_t>({
-{1, "[a-z]+", slexer::basic_lexer<char, size_t>::defaultf},
+{1, "[a-z]+", defaultf(char, size_t)},
 /* The defaultf function is the basic way to handle the rules,
 here the user can write their own function represented by:
 void function(basic_lexer<charT, idT>::master &);*/
