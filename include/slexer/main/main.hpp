@@ -58,7 +58,7 @@ namespace slexer
             /// @param _tokenstream Cadena de tokens
             /// @param _buffer Buffer
             master(size_t _gsize, slexer::basic_tokenstream<charT, idT> &_tokenstream, size_t size)
-                : _M_gsize(_gsize), _M_begin(0), _M_tokenstream(_tokenstream), stackbuffer()
+                : _M_gsize(_gsize), _M_begin(0), _M_tokenstream(_tokenstream), stackbuffer(), _M_capture_position(0), _M_capture_line(0), _M_capture_column(0)
             {
                 _M_capture._M_text.reserve(size);
             }
