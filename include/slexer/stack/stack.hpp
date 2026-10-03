@@ -34,7 +34,7 @@ namespace slexer
             if (_M_iterator.get() == nullptr)
                 _M_iterator = std::make_shared<_S_node>(_S_node(str, nullptr));
             else
-                _M_iterator = std::make_shared<_S_node>(size, std::move(_M_iterator));
+                _M_iterator = std::make_shared<_S_node>(str, std::move(_M_iterator));
             _M_size++;
         }
     
